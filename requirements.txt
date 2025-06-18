@@ -1,0 +1,7 @@
+flask
+flask-cors
+hdfs
+mysql-connector-python
+requests
+pyhive
+thrift

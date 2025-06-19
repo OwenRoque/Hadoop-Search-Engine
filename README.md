@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Hadoop Search Engine - Frontend (Next.js) + Backend (Flask)
 
-## Getting Started
+## Requisitos Previos
 
-First, run the development server:
+- Node.js:  
+  Instala Node.js (v18+ recomendado):
+  ```bash
+  sudo apt install nodejs npm
+  ```
+- Python 3 y pip (para backend Flask, en Ubuntu ya vienen por defecto)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Frontend - Next.js
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+1. Ir al directorio del frontend, e instalar dependencias y ejecutar el servidor:
+    ```bash
+    npm install
+    npm run dev
+    ```
+   - Si salen errores al instalar eliminar [package-lock.json](https://github.com/OwenRoque/Hadoop-Search-Engine/blob/0a31a692e2d22b6d41b151cc0b982960d77ba3b7/package-lock.json) 
+     y carpeta _node_modules_, luego reintentar con:
+   ```bash
+    npm install --legacy-peer-deps
+    ```
+   
+### El frontend se ejecuta en el puerto **3000** por defecto.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Backend - Flask + PyHive
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. En otra terminal, crear y activar un entorno virtual en la raíz del proyecto:
+    ```bash
+    python3 -m venv venv
+    source venv/bin/activate
+    ```
+2. Instalar dependencias necesarias:
+    ```bash
+    pip install -r requirements.txt
+    ```
+3. Ejecutar el backend:
+    ```bash
+    cd backend/
+    python backend.py
+    ```
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### El backend se ejecuta en el puerto **5000** por defecto.
+### La conexion a Hive se realiza en el puerto **10000** por defecto.

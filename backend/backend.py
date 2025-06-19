@@ -21,17 +21,21 @@ def load_metadata_from_hdfs():
     video_metadata = {}
 
     try:
-        files = hdfs_client.list(HDFS_JSON_PATH)
-        for file in files:
-            if file.endswith(".json"):
-                with hdfs_client.read(f"{HDFS_JSON_PATH}/{file}") as reader:
-                    data = json.load(reader)
+        with hdfs_client.read("/input.json", encoding='utf-8') as reader:
+            for line in reader:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
                     video_file = data.get("video_file")
                     if video_file:
                         video_metadata[video_file] = data
-        print(f"[INFO] Se cargaron {len(video_metadata)} metadatos de HDFS")
+                except json.JSONDecodeError as je:
+                    print(f"[WARN] Línea invalida en input.json: {je}")
+        print(f"[INFO] Se cargaron {len(video_metadata)} metadatos desde input.json")
     except Exception as e:
-        print(f"[ERROR] No se pudo cargar metadata de HDFS: {e}")
+        print(f"[ERROR] No se pudo cargar input.json desde HDFS: {e}")
 
 @app.route("/video/<filename>")
 def stream_video(filename):
@@ -49,17 +53,13 @@ def search():
 
     enriched_results = []
     for video_file in result_files:
-        json_file = video_file.replace(".mp4", ".json")
-        hdfs_path = f"{HDFS_JSON_PATH}/{json_file}"
-        try:
-            with hdfs_client.read(hdfs_path) as reader:
-                data = json.load(reader)
-                enriched_results.append(data)
-        except Exception as e:
-            print(f"[WARN] No se pudo cargar metadata de {json_file}: {e}")
+        data = video_metadata.get(video_file)
+        if data:
+            enriched_results.append(data)
+        else:
+            print(f"[WARN] No se encontró metadata para {video_file}")
 
     return jsonify(enriched_results)
-
 
 @app.route("/list")
 def list_files():
@@ -75,5 +75,5 @@ def list_files():
 
 
 if __name__ == "__main__":
-    # load_metadata_from_hdfs()
+    load_metadata_from_hdfs()
     app.run(debug=True, port=5000)

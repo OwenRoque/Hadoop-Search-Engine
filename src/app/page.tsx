@@ -1,12 +1,15 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Search, Play, ArrowLeft, Clock, MapPin, AlertTriangle, Users, Download, Share2 } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
+import { Search, Play, ArrowLeft, Clock, MapPin, AlertTriangle,
+  Users, Download, Share2, Upload, FileVideo, CheckCircle, } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Progress } from "@/components/ui/progress"
 import dynamic from "next/dynamic"
 
 // Importar ReactPlayer dinámicamente para evitar problemas de SSR
@@ -91,8 +94,16 @@ export default function VideoSearchEngine() {
   const [isVideoLoading, setIsVideoLoading] = useState(false)
   const [videoError, setVideoError] = useState(false)
 
+  // Estados para la subida de archivos
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
+  const [isDragOver, setIsDragOver] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadedFile, setUploadedFile] = useState(null)
+  const [uploadComplete, setUploadComplete] = useState(false)
+  const fileInputRef = useRef(null)
 
-  // Simular búsqueda con delay
+  // Simular busqueda con delay
   useEffect(() => {
     const fetchResults = async () => {
       if (searchQuery.trim() === "") {
@@ -154,6 +165,14 @@ export default function VideoSearchEngine() {
     })
   }
 
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return "0 Bytes"
+    const k = 1024
+    const sizes = ["Bytes", "KB", "MB", "GB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+  }
+
   const handleVideoReady = () => {
     console.log("Video listo para reproducirse")
     setIsVideoLoading(false)
@@ -201,6 +220,94 @@ export default function VideoSearchEngine() {
     setIsVideoLoading(false)
   }
 
+  // Funciones para la subida de archivos
+  const handleFileSelect = (files) => {
+    const file = files[0]
+    if (file && file.type === "video/mp4") {
+      if (!isUploading && !uploadComplete) {
+        setUploadedFile(file)
+        simulateUpload(file)
+      }
+    } else {
+      alert("Por favor selecciona un archivo MP4 válido")
+    }
+  }
+
+  const simulateUpload = (file) => {
+    setIsUploading(true)
+    setUploadProgress(0)
+    setUploadComplete(false)
+
+    // Simular progreso de subida
+    const interval = setInterval(() => {
+      setUploadProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(interval)
+          setIsUploading(false)
+          setUploadComplete(true)
+
+          // Agregar el video subido a los resultados
+          const newVideo = {
+            camera_id: `upload_${Date.now()}`,
+            location: "Video Subido",
+            priority: "media",
+            video_file: file.name,
+            video_url: URL.createObjectURL(file),
+            date: new Date().toISOString().split("T")[0],
+            timeslots: [
+              {
+                hour: "Pendiente análisis",
+                object_counts: { pending: 0 },
+              },
+            ],
+            alerts: [],
+          }
+
+          setSearchResults((prev) => {
+            const alreadyExists = prev.some(v => v.video_file === file.name)
+            if (!alreadyExists) {
+              return [newVideo, ...prev]
+            }
+            return prev
+          })
+
+          // Cerrar modal despues de 2 segundos
+          setTimeout(() => {
+            resetUploadState()
+            setIsUploadModalOpen(false)
+          }, 2000)
+
+          return 100
+        }
+        return prev + Math.random() * 15
+      })
+    }, 200)
+  }
+
+  const resetUploadState = () => {
+    setUploadProgress(0)
+    setIsUploading(false)
+    setUploadedFile(null)
+    setUploadComplete(false)
+    setIsDragOver(false)
+  }
+
+  const handleDragOver = (e) => {
+    e.preventDefault()
+    setIsDragOver(true)
+  }
+
+  const handleDragLeave = (e) => {
+    e.preventDefault()
+    setIsDragOver(false)
+  }
+
+  const handleDrop = (e) => {
+    e.preventDefault()
+    setIsDragOver(false)
+    const files = Array.from(e.dataTransfer.files)
+    handleFileSelect(files)
+  }
 
   if (selectedVideo) {
     return (
@@ -355,11 +462,11 @@ export default function VideoSearchEngine() {
                           {selectedVideo.alerts.map((alert, index) => (
                               <div key={index} className="border-l-4 border-red-400 bg-red-50 p-4 rounded-r-lg">
                                 <div className="flex justify-between items-start mb-2">
-                                  <h4 className="font-medium text-red-900 capitalize">{alert.type.replace(/_/g, " ")}</h4>
+                                  <h4 className="font-medium text-red-900 capitalize">{alert.event_type.replace(/_/g, " ")}</h4>
                                   <span className="text-xs text-red-600">{formatTimestamp(alert.timestamp)}</span>
                                 </div>
                                 <div className="text-sm text-red-700">
-                                  {Object.entries(alert.details).map(([key, value]) => (
+                                  {alert.details && Object.entries(alert.details).map(([key, value]) => (
                                       <p key={key}>
                                         <span className="capitalize">{key.replace(/_/g, " ")}: </span>
                                         {value as string}
@@ -391,17 +498,115 @@ export default function VideoSearchEngine() {
               <p className="text-slate-600">Sistema basado en Hadoop para análisis de video</p>
             </div>
 
-            {/* Barra de búsqueda */}
-            <div className="relative max-w-2xl mx-auto">
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <Input
-                    type="text"
-                    placeholder="Buscar por objetos en video..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-12 pr-4 py-4 text-lg border-2 border-slate-200 rounded-full focus:border-slate-400 focus:ring-0 shadow-lg"
-                />
+            <div className="max-w-2xl mx-auto space-y-4">
+              {/* Barra de búsqueda */}
+              <div className="relative max-w-2xl mx-auto">
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                  <Input
+                      type="text"
+                      placeholder="Buscar por objetos en video..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-12 pr-4 py-4 text-lg border-2 border-slate-200 rounded-full focus:border-slate-400 focus:ring-0 shadow-lg"
+                  />
+                </div>
+              </div>
+
+              {/* Botón de subir video */}
+              <div className="flex justify-center">
+                <Dialog open={isUploadModalOpen} onOpenChange={setIsUploadModalOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                        variant="outline"
+                        className="flex items-center gap-2 px-6 py-3 text-slate-700 border-2 border-slate-200 hover:border-slate-400 hover:bg-slate-50 rounded-full shadow-md"
+                        onClick={() => resetUploadState()}
+                    >
+                      <Upload className="w-5 h-5" />
+                      Subir Video
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <Upload className="w-5 h-5" />
+                        Subir Video
+                      </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                      {!uploadComplete ? (
+                          <>
+                            {/* Área de drag & drop */}
+                            <div
+                                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                                    isDragOver ? "border-blue-400 bg-blue-50" : "border-slate-300 hover:border-slate-400"
+                                }`}
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={handleDrop}
+                            >
+                              <FileVideo className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                              <p className="text-lg font-medium text-slate-700 mb-2">Arrastra tu video aquí</p>
+                              <p className="text-sm text-slate-500 mb-4">o haz clic para seleccionar un archivo MP4</p>
+                              <Button
+                                  variant="outline"
+                                  onClick={() => fileInputRef.current?.click()}
+                                  disabled={isUploading}
+                              >
+                                Seleccionar archivo
+                              </Button>
+                              <input
+                                  ref={fileInputRef}
+                                  type="file"
+                                  accept="video/mp4"
+                                  className="hidden"
+                                  onChange={(e) => handleFileSelect(e.target.files)}
+                              />
+                            </div>
+
+                            {/* Información del archivo seleccionado */}
+                            {uploadedFile && (
+                                <div className="bg-slate-50 p-4 rounded-lg">
+                                  <div className="flex items-center gap-3 mb-2">
+                                    <FileVideo className="w-5 h-5 text-slate-600" />
+                                    <div className="flex-1">
+                                      <p className="font-medium text-slate-900">{uploadedFile.name}</p>
+                                      <p className="text-sm text-slate-600">{formatFileSize(uploadedFile.size)}</p>
+                                    </div>
+                                  </div>
+
+                                  {/* Barra de progreso */}
+                                  {isUploading && (
+                                      <div className="space-y-2">
+                                        <div className="flex justify-between text-sm">
+                                          <span className="text-slate-600">Subiendo...</span>
+                                          <span className="text-slate-900 font-medium">{Math.round(uploadProgress)}%</span>
+                                        </div>
+                                        <Progress value={uploadProgress} className="h-2" />
+                                      </div>
+                                  )}
+                                </div>
+                            )}
+                          </>
+                      ) : (
+                          /* Estado de subida completada */
+                          <div className="text-center py-8">
+                            <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                            <h3 className="text-lg font-semibold text-slate-900 mb-2">¡Video subido exitosamente!</h3>
+                            <p className="text-slate-600 mb-4">
+                              Tu video ha sido procesado y agregado a los resultados de búsqueda.
+                            </p>
+                            <div className="bg-green-50 p-3 rounded-lg">
+                              <p className="text-sm text-green-800">
+                                <span className="font-medium">Archivo:</span> {uploadedFile?.name}
+                              </p>
+                            </div>
+                          </div>
+                      )}
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
           </div>
@@ -430,6 +635,7 @@ export default function VideoSearchEngine() {
                           key={index}
                           className="hover:shadow-lg transition-all duration-200 cursor-pointer border-0 shadow-md"
                           onClick={() => {
+                              // handleVideoSelect(video);
                               setSelectedVideo(video);
                             }
                           }
